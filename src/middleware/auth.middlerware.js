@@ -1,21 +1,25 @@
-// middleware/auth.middleware.js
 const jwt = require("jsonwebtoken");
+const userModel = require("../models/user.model");
 
-const authMiddleware = (req, res, next) => {
-  const token =
-    req.cookies?.token || req.header("Authorization")?.replace("Bearer ", "");
-
-  if (!token) {
-    return res.status(401).json({ msg: "No token, authorization denied" });
-  }
-
+async function auth(req, res, next) {
   try {
-    const decoded = jwt.verify(token, process.env.SECRETKEY);
-    req.user = decoded; // <-- attach decoded payload { id, role }
+    // Accept JWT from either Cookie or Authorization header
+    const token = req.cookies?.token || req.headers.authorization?.split(" ")[1];
+    if (!token) return res.status(401).json({ message: "Unauthorized" });
+
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const user = await userModel
+      .findById(decoded.id)
+      .select("_id email fullName");
+    if (!user) return res.status(401).json({ message: "Unauthorized" });
+    req.user = user;
     next();
-  } catch (err) {
-    return res.status(401).json({ msg: "Token is not valid" });
+  } catch (e) {
+    return res.status(401).json({ message: "Unauthorized" });
   }
+}
+
+module.exports = {
+  auth,
 };
 
-module.exports = authMiddleware;
